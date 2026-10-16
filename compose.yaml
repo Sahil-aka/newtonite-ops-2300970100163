@@ -22,7 +22,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-newtonite}:${POSTGRES_PASSWORD:-newtonite_dev}@db:5432/${POSTGRES_DB:-newtonite}
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - .:/app
     depends_on:
