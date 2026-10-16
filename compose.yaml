@@ -17,10 +17,13 @@ services:
       retries: 10
 
   api:
-    build: .
+    build:
+      context: .
+      target: development
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-newtonite}:${POSTGRES_PASSWORD:-newtonite_dev}@db:5432/${POSTGRES_DB:-newtonite}
+      TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-newtonite}:${POSTGRES_PASSWORD:-newtonite_dev}@db:5432/newtonite_test
       JWT_SECRET: ${JWT_SECRET:-local-demo-secret-change-before-deploy}
     ports:
       - "8001:8000"
