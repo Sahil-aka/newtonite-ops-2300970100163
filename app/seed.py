@@ -89,7 +89,8 @@ def seed(sample_item_count: int) -> None:
             session.scalars(select(WorkItem.id).where(WorkItem.id.in_([spec[5] for spec in item_specs])))
         ) if item_specs else set()
 
-        for number, team_name, lead, creator, assignee, item_id in item_specs:
+        activity_events = []
+        for number, team_name, _lead, creator, assignee, item_id in item_specs:
             if item_id in existing_ids:
                 continue
             item_type = ITEM_TYPES[number % len(ITEM_TYPES)]
@@ -110,7 +111,7 @@ def seed(sample_item_count: int) -> None:
                 version=1,
             )
             session.add(item)
-            session.add(
+            activity_events.append(
                 ActivityEvent(
                     item_id=item_id,
                     actor_id=creator.id,
@@ -118,6 +119,10 @@ def seed(sample_item_count: int) -> None:
                     new_value={"title": title, "status": status, "priority": priority},
                 )
             )
+
+        # Flush parent rows first; the events reference their work item IDs.
+        session.flush()
+        session.add_all(activity_events)
 
     print(f"Demo seed complete: {len(TEAM_NAMES)} teams, {len(USERS)} users, {sample_item_count} sample items requested.")
     print(f"Shared demo password: {DEMO_PASSWORD}")
