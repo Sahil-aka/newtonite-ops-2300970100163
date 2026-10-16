@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, tuple_
+from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -18,9 +18,19 @@ from app.schemas import (
     WorkItemDetailResponse,
     WorkItemPage,
     WorkItemResponse,
+    WorkItemTransition,
+    WorkItemUpdate,
 )
 
 router = APIRouter(tags=["work items"])
+EDIT_ROLES = ("member", "lead", "admin")
+ALLOWED_TRANSITIONS = {
+    "open": {"in_progress"},
+    "in_progress": {"awaiting_approval"},
+    "awaiting_approval": {"resolved"},
+    "resolved": {"closed"},
+    "closed": set(),
+}
 
 
 def encode_cursor(item: WorkItem) -> str:
@@ -139,6 +149,146 @@ def get_accessible_item(db: Session, item_id: UUID, user_id: UUID) -> WorkItem:
     )
     if item is None:
         raise HTTPException(status_code=404, detail="Work item not found")
+    return item
+
+
+def require_item_role(db: Session, item: WorkItem, user: User, allowed_roles: tuple[str, ...]) -> None:
+    membership = db.get(Membership, (user.id, item.team_id))
+    if membership is None:
+        raise HTTPException(status_code=404, detail="Work item not found")
+    if membership.role not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Your team role cannot perform this action")
+
+
+@router.post("/items/{item_id}/claim", response_model=WorkItemResponse)
+def claim_work_item(
+    item_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> WorkItemResponse:
+    item = get_accessible_item(db, item_id, user.id)
+    require_item_role(db, item, user, EDIT_ROLES)
+
+    result = db.execute(
+        update(WorkItem)
+        .where(WorkItem.id == item.id, WorkItem.team_id == item.team_id, WorkItem.assignee_id.is_(None))
+        .values(
+            assignee_id=user.id,
+            version=WorkItem.version + 1,
+            updated_at=func.now(),
+        )
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This item was already claimed; refresh and try again")
+
+    db.add(
+        ActivityEvent(
+            item_id=item.id,
+            actor_id=user.id,
+            event_type="claimed",
+            old_value={"assignee_id": None},
+            new_value={"assignee_id": str(user.id)},
+        )
+    )
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.patch("/items/{item_id}", response_model=WorkItemResponse)
+def update_work_item(
+    item_id: UUID,
+    payload: WorkItemUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> WorkItemResponse:
+    item = get_accessible_item(db, item_id, user.id)
+    require_item_role(db, item, user, EDIT_ROLES)
+
+    changes = payload.model_dump(exclude_unset=True, exclude={"expected_version"})
+    old_values = {name: getattr(item, name) for name in changes}
+    new_values = {
+        name: value.isoformat() if hasattr(value, "isoformat") else value
+        for name, value in changes.items()
+    }
+    result = db.execute(
+        update(WorkItem)
+        .where(WorkItem.id == item.id, WorkItem.version == payload.expected_version)
+        .values(**changes, version=WorkItem.version + 1, updated_at=func.now())
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Work item changed; reload it before saving")
+
+    db.add(
+        ActivityEvent(
+            item_id=item.id,
+            actor_id=user.id,
+            event_type="updated",
+            old_value={
+                name: value.isoformat() if hasattr(value, "isoformat") else value
+                for name, value in old_values.items()
+            },
+            new_value=new_values,
+        )
+    )
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.post("/items/{item_id}/transition", response_model=WorkItemResponse)
+def transition_work_item(
+    item_id: UUID,
+    payload: WorkItemTransition,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> WorkItemResponse:
+    item = get_accessible_item(db, item_id, user.id)
+    require_item_role(db, item, user, EDIT_ROLES)
+
+    if item.version != payload.expected_version:
+        raise HTTPException(status_code=409, detail="Work item changed; reload it before continuing")
+    if payload.target_status not in ALLOWED_TRANSITIONS[item.status]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Transition from {item.status} to {payload.target_status} is not allowed",
+        )
+    if item.status == "awaiting_approval" and payload.target_status == "resolved":
+        membership = db.get(Membership, (user.id, item.team_id))
+        if membership is None or membership.role != "lead":
+            raise HTTPException(status_code=403, detail="Only a team Lead can approve this item")
+
+    previous_status = item.status
+    result = db.execute(
+        update(WorkItem)
+        .where(
+            WorkItem.id == item.id,
+            WorkItem.version == payload.expected_version,
+            WorkItem.status == previous_status,
+        )
+        .values(
+            status=payload.target_status,
+            version=WorkItem.version + 1,
+            updated_at=func.now(),
+        )
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Work item changed; reload it before continuing")
+
+    db.add(
+        ActivityEvent(
+            item_id=item.id,
+            actor_id=user.id,
+            event_type="transitioned",
+            old_value={"status": previous_status},
+            new_value={"status": payload.target_status},
+        )
+    )
+    db.commit()
+    db.refresh(item)
     return item
 
 

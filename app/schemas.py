@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class LoginRequest(BaseModel):
@@ -49,11 +49,47 @@ class WorkItemCreate(BaseModel):
 
     @field_validator("title")
     @classmethod
-    def trim_title(cls, value: str) -> str:
+    def trim_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
         value = value.strip()
         if not value:
             raise ValueError("Title cannot be blank")
         return value
+
+
+class WorkItemUpdate(BaseModel):
+    expected_version: int = Field(gt=0)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=10_000)
+    item_type: ItemType | None = None
+    priority: Priority | None = None
+    due_at: datetime | None = None
+
+    @field_validator("title")
+    @classmethod
+    def trim_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("Title cannot be blank")
+        return value
+
+    @model_validator(mode="after")
+    def require_update_fields(self) -> "WorkItemUpdate":
+        provided = self.model_fields_set - {"expected_version"}
+        if not provided:
+            raise ValueError("Provide at least one field to update")
+        for field_name in ("title", "description", "item_type", "priority"):
+            if field_name in provided and getattr(self, field_name) is None:
+                raise ValueError(f"{field_name} cannot be null")
+        return self
+
+
+class WorkItemTransition(BaseModel):
+    expected_version: int = Field(gt=0)
+    target_status: Status
 
 
 class ActivityEventResponse(BaseModel):
