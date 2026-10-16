@@ -21,6 +21,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-newtonite}:${POSTGRES_PASSWORD:-newtonite_dev}@db:5432/${POSTGRES_DB:-newtonite}
+      JWT_SECRET: ${JWT_SECRET:-local-demo-secret-change-before-deploy}
     ports:
       - "8001:8000"
     volumes:
