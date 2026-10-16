@@ -3,7 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.routers import auth, teams
+from app.routers import auth, teams, work_items
 
 app = FastAPI(
     title="Newtonite Operations Tracker",
@@ -12,6 +12,7 @@ app = FastAPI(
 )
 app.include_router(auth.router)
 app.include_router(teams.router)
+app.include_router(work_items.router)
 
 
 @app.get("/health", tags=["health"])
