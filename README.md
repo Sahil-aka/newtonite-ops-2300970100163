@@ -117,6 +117,10 @@ Environment variables are read from `.env` locally. `.env.example` shows the loc
 
 Before publishing, replace demo credentials, use provider-managed secrets and database, apply Alembic migrations, and verify the production health endpoints. The frontend has not yet had automated browser coverage; Render deployment configuration remains to be completed.
 
+### Keeping a free Render demo warm
+
+The GitHub Actions workflow in `.github/workflows/render-keepalive.yml` requests the app's `/health` endpoint every five minutes. After deploying, add a repository Actions secret named `RENDER_HEALTH_URL` with the full URL, for example `https://your-service.onrender.com/health`. GitHub scheduled workflows can be delayed, so this may reduce cold starts but cannot guarantee that a free Render service never spins down. A paid Render web-service plan is the reliable option for avoiding idle spin-down.
+
 ## Repository layout
 
 ```text
