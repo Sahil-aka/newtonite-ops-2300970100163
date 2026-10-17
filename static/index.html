@@ -24,7 +24,15 @@
           <p class="form-error" id="login-error" role="alert"></p>
           <button class="button button-primary button-wide" type="submit">Sign in <span aria-hidden="true">→</span></button>
         </form>
-        <p class="login-hint">Use a seeded demo account from the project README.</p>
+        <p class="login-hint">Use a seeded demo account from the project README, or <button class="text-button" id="show-signup" type="button">create an account</button>.</p>
+        <form id="signup-form" class="form-stack" hidden>
+          <label>Your name<input name="display_name" autocomplete="name" maxlength="120" required /></label>
+          <label>Email<input name="email" type="email" autocomplete="email" required /></label>
+          <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required /></label>
+          <p class="form-error" id="signup-error" role="alert"></p>
+          <button class="button button-primary button-wide" type="submit">Create account <span aria-hidden="true">→</span></button>
+          <p class="login-hint signup-switch">Already have an account? <button class="text-button" id="show-login" type="button">Sign in</button></p>
+        </form>
       </div>
     </section>
 

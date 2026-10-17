@@ -46,7 +46,21 @@ class ApiError extends Error {
 function showLogin(message = "") {
   $("#app-view").hidden = true;
   $("#login-view").hidden = false;
+  $("#login-form").hidden = false;
+  $("#signup-form").hidden = true;
+  $("#show-signup").closest(".login-hint").hidden = false;
+  $("#login-view h1").textContent = "Welcome back";
+  $("#login-view > .login-card > .muted").textContent = "Sign in to see what needs your team's attention.";
   $("#login-error").textContent = message;
+}
+
+function showSignup() {
+  $("#login-form").hidden = true;
+  $("#signup-form").hidden = false;
+  $("#show-signup").closest(".login-hint").hidden = true;
+  $("#login-view h1").textContent = "Create your account";
+  $("#login-view > .login-card > .muted").textContent = "Join the Operations workspace and get started.";
+  $("#signup-error").textContent = "";
 }
 
 function showApp() {
@@ -346,6 +360,31 @@ $("#login-form").addEventListener("submit", async (event) => {
     $("#login-error").textContent = error.message;
   }
 });
+
+$("#signup-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const errorElement = $("#signup-error");
+  errorElement.textContent = "";
+  try {
+    const result = await api("/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({
+        display_name: data.get("display_name"),
+        email: data.get("email"),
+        password: data.get("password"),
+      }),
+    });
+    state.token = result.access_token;
+    sessionStorage.setItem("newtonite_token", state.token);
+    await startApp();
+  } catch (error) {
+    errorElement.textContent = error.message;
+  }
+});
+
+$("#show-signup").addEventListener("click", showSignup);
+$("#show-login").addEventListener("click", () => showLogin());
 
 $("#team-picker").addEventListener("change", async (event) => {
   state.teamId = event.target.value;

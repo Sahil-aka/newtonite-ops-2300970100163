@@ -721,6 +721,18 @@ tbody td {
   margin:19px 0 0;
   text-align:center
 }
+.text-button {
+  border:0;
+  padding:0;
+  background:none;
+  color:#4267ce;
+  font:inherit;
+  cursor:pointer
+}
+.signup-switch {
+  margin:0;
+  text-align:center
+}
 .form-error {
   color:#c44949;
   font-size:11px;

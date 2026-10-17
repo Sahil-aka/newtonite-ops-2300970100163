@@ -15,6 +15,28 @@ class LoginRequest(BaseModel):
         return value.strip().lower()
 
 
+class SignupRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Name cannot be blank")
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def normalize_signup_email(cls, value: str) -> str:
+        value = value.strip().lower()
+        if "@" not in value or "." not in value.rsplit("@", 1)[-1]:
+            raise ValueError("Enter a valid email address")
+        return value
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
