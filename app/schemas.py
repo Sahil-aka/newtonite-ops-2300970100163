@@ -92,6 +92,18 @@ class WorkItemTransition(BaseModel):
     target_status: Status
 
 
+class WorkItemCommentCreate(BaseModel):
+    comment: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("comment")
+    @classmethod
+    def trim_comment(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Comment cannot be blank")
+        return value
+
+
 class ActivityEventResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -15,6 +15,7 @@ from app.schemas import (
     Priority,
     Status,
     WorkItemCreate,
+    WorkItemCommentCreate,
     WorkItemDetailResponse,
     WorkItemPage,
     WorkItemResponse,
@@ -100,6 +101,7 @@ def list_work_items(
     status_filter: Status | None = Query(default=None, alias="status"),
     priority: Priority | None = None,
     assignee_id: UUID | None = None,
+    unassigned: bool = False,
     q: str | None = Query(default=None, min_length=1, max_length=100),
     cursor: str | None = None,
     limit: int = Query(default=25, ge=1, le=100),
@@ -121,6 +123,8 @@ def list_work_items(
         statement = statement.where(WorkItem.priority == priority)
     if assignee_id is not None:
         statement = statement.where(WorkItem.assignee_id == assignee_id)
+    if unassigned:
+        statement = statement.where(WorkItem.assignee_id.is_(None))
     if q and q.strip():
         search = f"%{q.strip()}%"
         statement = statement.where(WorkItem.title.ilike(search) | WorkItem.description.ilike(search))
@@ -309,3 +313,24 @@ def read_work_item(
         **WorkItemResponse.model_validate(item).model_dump(),
         activity=[ActivityEventResponse.model_validate(event) for event in activity_rows],
     )
+
+
+@router.post("/items/{item_id}/comments", response_model=ActivityEventResponse, status_code=201)
+def add_work_item_comment(
+    item_id: UUID,
+    payload: WorkItemCommentCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ActivityEventResponse:
+    item = get_accessible_item(db, item_id, user.id)
+    require_item_role(db, item, user, EDIT_ROLES)
+    event = ActivityEvent(
+        item_id=item.id,
+        actor_id=user.id,
+        event_type="commented",
+        new_value={"comment": payload.comment},
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return ActivityEventResponse.model_validate(event)
