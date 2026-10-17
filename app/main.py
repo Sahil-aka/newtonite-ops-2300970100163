@@ -1,4 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -29,3 +30,6 @@ def readiness_check(db: Session = Depends(get_db)) -> dict[str, str]:
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Database is unavailable") from exc
     return {"status": "ready"}
+
+
+app.mount("/", StaticFiles(directory="static", html=True), name="frontend")

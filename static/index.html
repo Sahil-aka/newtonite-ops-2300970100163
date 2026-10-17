@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f6f8" />
+    <title>Newtonite | Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <section class="login-page" id="login-view" hidden>
+      <div class="login-card">
+        <div class="brand-mark">N</div>
+        <p class="eyebrow">NEWTONITE · OPERATIONS</p>
+        <h1>Welcome back</h1>
+        <p class="muted">Sign in to see what needs your team's attention.</p>
+        <form id="login-form" class="form-stack">
+          <label>Email<input name="email" type="email" autocomplete="username" placeholder="name@newtonite.local" required /></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+          <p class="form-error" id="login-error" role="alert"></p>
+          <button class="button button-primary button-wide" type="submit">Sign in <span aria-hidden="true">→</span></button>
+        </form>
+        <p class="login-hint">Use a seeded demo account from the project README.</p>
+      </div>
+    </section>
+
+    <div class="app-shell" id="app-view" hidden>
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="Newtonite home"><span class="brand-mark small">N</span><span>newtonite<span class="brand-sub">OPERATIONS</span></span></a>
+        <div class="workspace-label">WORKSPACE</div>
+        <label class="team-picker-label" for="team-picker">Team</label>
+        <select id="team-picker" class="team-picker" aria-label="Select team"></select>
+        <div class="sidebar-heading">WORK QUEUE</div>
+        <nav class="queue-nav" aria-label="Work queue">
+          <button class="queue-link active" data-queue="all"><span class="nav-icon">▦</span> All work</button>
+          <button class="queue-link" data-queue="mine"><span class="nav-icon">◉</span> Assigned to me</button>
+          <button class="queue-link" data-queue="urgent"><span class="nav-icon">↗</span> Unassigned urgent</button>
+          <button class="queue-link" data-queue="approval"><span class="nav-icon">◷</span> Awaiting approval</button>
+        </nav>
+        <div class="sidebar-bottom"><div class="avatar" id="user-avatar">S</div><div class="user-meta"><strong id="user-name">Signed in</strong><span id="user-role">Team member</span></div><button id="logout-button" class="icon-button" title="Sign out" aria-label="Sign out">↪</button></div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar"><div class="breadcrumbs"><span>Workspace</span><span class="crumb-slash">/</span><strong id="current-team-name">Operations</strong></div><div class="topbar-right"><span class="live-dot"></span><span>All systems operational</span><div class="topbar-avatar" id="topbar-avatar">S</div></div></header>
+        <div class="page-wrap">
+          <section class="page-heading">
+            <div><p class="eyebrow" id="today-label">TEAM WORKSPACE</p><h1>Good work starts with clarity.</h1><p class="muted">See what’s moving, what’s blocked, and where you can help.</p></div>
+            <button id="new-item-button" class="button button-primary"><span class="plus">＋</span> New work item</button>
+          </section>
+
+          <section class="summary-grid" aria-label="Current list summary">
+            <article class="summary-card"><div class="summary-label">VISIBLE WORK</div><div class="summary-bottom"><strong id="visible-count">—</strong><span class="summary-icon blue">▦</span></div><span class="summary-foot">Items on this page</span></article>
+            <article class="summary-card"><div class="summary-label">UNASSIGNED URGENT</div><div class="summary-bottom"><strong id="urgent-count">—</strong><span class="summary-icon orange">↗</span></div><span class="summary-foot">On this page</span></article>
+            <article class="summary-card"><div class="summary-label">AWAITING APPROVAL</div><div class="summary-bottom"><strong id="approval-count">—</strong><span class="summary-icon violet">◷</span></div><span class="summary-foot">On this page</span></article>
+            <article class="summary-card"><div class="summary-label">MY OPEN WORK</div><div class="summary-bottom"><strong id="mine-count">—</strong><span class="summary-icon green">◉</span></div><span class="summary-foot">On this page</span></article>
+          </section>
+
+          <section class="work-panel">
+            <div class="panel-heading"><div><div class="panel-title-row"><h2 id="list-title">All work items</h2><span id="result-badge" class="result-badge">Loading</span></div><p class="muted small-copy">Operational work across your selected team</p></div><button id="refresh-button" class="button button-secondary"><span class="refresh-icon">↻</span> Refresh</button></div>
+            <div class="filters">
+              <label class="search-box"><span aria-hidden="true">⌕</span><input type="search" id="search-input" placeholder="Search work items…" aria-label="Search work items" /><kbd>⌘ K</kbd></label>
+              <select id="status-filter" aria-label="Filter by status"><option value="">All statuses</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="awaiting_approval">Awaiting approval</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select>
+              <select id="priority-filter" aria-label="Filter by priority"><option value="">All priorities</option><option value="urgent">Urgent</option><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select>
+              <button id="clear-filters" class="clear-filters">Clear filters</button>
+            </div>
+            <div class="table-scroll"><table><thead><tr><th>WORK ITEM</th><th>PRIORITY</th><th>STATUS</th><th>ASSIGNEE</th><th>UPDATED</th><th></th></tr></thead><tbody id="item-rows"></tbody></table></div>
+            <div class="empty-state" id="empty-state" hidden><div class="empty-icon">✓</div><strong>No work items found</strong><span>Try another filter or create a new item.</span></div>
+            <div class="panel-footer"><span id="list-caption">Showing your team's work</span><button id="load-more" class="button button-secondary load-more" hidden>Load more</button></div>
+          </section>
+          <p class="page-footnote">A clear queue makes it easier to focus on the work that matters.</p>
+        </div>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <dialog id="detail-dialog" class="detail-dialog"><div class="dialog-shell"><div class="dialog-top"><span class="eyebrow">WORK ITEM DETAILS</span><button class="icon-button close-dialog" aria-label="Close details">×</button></div><div id="detail-content"></div></div></dialog>
+
+    <dialog id="create-dialog" class="create-dialog"><div class="dialog-shell"><div class="dialog-top"><div><span class="eyebrow">NEW WORK</span><h2>Create a work item</h2></div><button class="icon-button close-dialog" aria-label="Close form">×</button></div><form id="create-form" class="form-stack"><label>Title<input name="title" maxlength="200" required placeholder="What needs to get done?" /></label><label>Description<textarea name="description" maxlength="10000" rows="3" placeholder="Add context for your team…"></textarea></label><div class="form-row"><label>Type<select name="item_type"><option value="task">Task</option><option value="incident">Incident</option><option value="customer_issue">Customer issue</option><option value="payment">Payment</option><option value="compliance">Compliance</option></select></label><label>Priority<select name="priority"><option value="normal">Normal</option><option value="urgent">Urgent</option><option value="high">High</option><option value="low">Low</option></select></label></div><label>Due date<input name="due_at" type="date" /></label><p class="form-error" id="create-error" role="alert"></p><div class="dialog-actions"><button class="button button-secondary close-dialog" type="button">Cancel</button><button class="button button-primary" type="submit">Create item</button></div></form></div></dialog>
+  </body>
+</html>
