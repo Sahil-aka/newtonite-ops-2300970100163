@@ -48,17 +48,19 @@ All work item routes require `Authorization: Bearer <access-token>`.
 | `POST /auth/login` | Exchange demo credentials for an access token |
 | `GET /auth/me` | Return the authenticated user |
 | `GET /teams` | List the current user's teams and roles |
+| `GET /teams/{team_id}/members` | List active members of a team the caller belongs to |
 | `POST /teams/{team_id}/items` | Create a work item for a team |
 | `GET /items` | List accessible items; supports team, status, priority, assignee, text query, cursor, and limit filters |
 | `GET /items/{item_id}` | Read an item with up to 50 latest activity events |
 | `POST /items/{item_id}/claim` | Atomically claim an unassigned item |
+| `POST /items/{item_id}/assign` | Assign or unassign an item with a version check; the assignee must belong to the same team |
 | `PATCH /items/{item_id}` | Update item fields using an expected version |
 | `POST /items/{item_id}/transition` | Move an item through an allowed workflow transition |
 | `POST /items/{item_id}/comments` | Add a comment to the item's activity history |
 | `GET /health` | Check that the API process is running |
 | `GET /health/ready` | Check that the API can query PostgreSQL |
 
-Workflow: `open` → `in_progress` → `awaiting_approval` → `resolved` → `closed`. Only a team Lead can approve an item from `awaiting_approval` to `resolved`. Viewers can read team data; members, leads, and admins can create or change work items and add comments. A user without membership receives `404` for team-scoped resources. The interface provides team selection, queue shortcuts, server-side search and filters, cursor-based "Load more," create, claim, edit, transition, approval, and activity/comment views.
+Workflow: `open` → `in_progress` → `awaiting_approval` → `resolved` → `closed`. Only a team Lead can approve an item from `awaiting_approval` to `resolved`. Viewers can read team data; members, leads, and admins can create, assign, or change work items and add comments. A user without membership receives `404` for team-scoped resources. The interface provides team selection, queue shortcuts, server-side search and filters, cursor-based "Load more," create, self-claim, assign/unassign to a teammate, edit, transition, approval, and activity/comment views.
 
 ## Database migrations
 
@@ -73,7 +75,7 @@ docker compose up --build -d
 docker compose exec api pytest -q
 ```
 
-The current suite covers simultaneous claims, stale version updates, Lead approval permissions, cross-team access, and invalid workflow transitions.
+The current suite covers simultaneous claims, stale version updates, Lead approval permissions, cross-team access, invalid workflow transitions, and team-scoped assignment with history.
 
 ## Configuration and deployment notes
 

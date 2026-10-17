@@ -28,6 +28,8 @@ Claiming uses a conditional database update that succeeds only while `assignee_i
 
 Edits include an `expected_version`. Updates increment the version only when it matches the current row, rejecting stale edits with `409 Conflict`. Workflow changes check the allowed transition, expected version, and role. Each successful mutation records its activity event in the same transaction as the item change, so the event history cannot claim a change that failed to save.
 
+Explicit assignment uses the same version check and only accepts an active user who belongs to the item's team. This prevents cross-team assignments and makes a simultaneous reassignment conflict visible instead of silently overwriting it. Claim remains a separate atomic action for a user taking an unassigned item themselves.
+
 ## Activity history and comments
 
 The `activity_events` table stores the actor, event type, and old/new values for item creation, claims, edits, transitions, and comments. Comments are append-only events in the same history, avoiding a separate comments table for this small application. Item detail returns the latest 50 events to keep responses bounded. A fuller audit policy could add retention rules, stronger immutability guarantees, and pagination for long histories.

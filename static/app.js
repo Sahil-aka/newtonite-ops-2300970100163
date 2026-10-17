@@ -2,6 +2,7 @@ const state = {
   token: sessionStorage.getItem("newtonite_token"),
   user: null,
   teams: [],
+  members: [],
   teamId: "",
   role: "viewer",
   queue: "all",
@@ -82,6 +83,7 @@ async function startApp() {
     const existing = state.teams.find((team) => team.team_id === state.teamId);
     state.teamId = existing?.team_id || state.teams[0].team_id;
     state.role = state.teams.find((team) => team.team_id === state.teamId)?.role || "viewer";
+    await loadTeamMembers();
     renderTeams();
     renderUser();
     showApp();
@@ -89,6 +91,10 @@ async function startApp() {
   } catch (error) {
     if (!(error instanceof ApiError && error.status === 401)) showLogin(error.message);
   }
+}
+
+async function loadTeamMembers() {
+  state.members = await api(`/teams/${state.teamId}/members`);
 }
 
 function renderTeams() {
@@ -166,8 +172,9 @@ function renderItems() {
   $("#list-caption").textContent = `Showing ${items.length} item${items.length === 1 ? "" : "s"} on this page`;
   $("#empty-state").hidden = items.length > 0;
   rows.innerHTML = items.map((item) => {
-    const assignee = item.assignee_id === state.user.id ? state.user.display_name : item.assignee_id ? "Assigned" : "Unassigned";
-    const initialsText = item.assignee_id === state.user.id ? initials(state.user.display_name) : item.assignee_id ? "•" : "–";
+    const assigneeMember = state.members.find((member) => member.id === item.assignee_id);
+    const assignee = assigneeMember?.display_name || "Unassigned";
+    const initialsText = assigneeMember ? initials(assigneeMember.display_name) : "–";
     const updated = item.updated_at ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(item.updated_at)) : "—";
     const itemIcon = { incident: "ϟ", payment: "$", compliance: "✓", customer_issue: "◌", task: "▤" }[item.item_type] || "▤";
     return `<tr>
@@ -193,6 +200,11 @@ function eventDescription(event) {
   const oldValue = event.old_value || {};
   if (event.event_type === "created") return `Created “${newValue.title || "work item"}”.`;
   if (event.event_type === "claimed") return "Claimed this work item.";
+  if (event.event_type === "assigned") {
+    const previous = state.members.find((member) => member.id === oldValue.assignee_id)?.display_name || "Unassigned";
+    const next = state.members.find((member) => member.id === newValue.assignee_id)?.display_name || "Unassigned";
+    return `Reassigned from ${previous} to ${next}.`;
+  }
   if (event.event_type === "commented") return `Comment: ${newValue.comment || ""}`;
   if (event.event_type === "transitioned") return `Moved from ${humanize(oldValue.status || "unknown")} to ${humanize(newValue.status || "unknown")}.`;
   if (event.event_type === "updated") return `Updated ${Object.keys(newValue).map(humanize).join(", ") || "this work item"}.`;
@@ -222,6 +234,7 @@ async function openDetail(itemId) {
         ${isEditor && isUnassigned ? '<button class="button button-primary" id="claim-item">Claim item</button>' : ""}
         ${isEditor && showTransition ? `<button class="button button-secondary" id="transition-item">${item.status === "awaiting_approval" ? "Approve item" : `Move to ${safe(humanize(next))}`}</button>` : ""}
       </div>
+      ${isEditor ? `<form id="assign-item-form" class="assign-form"><label for="assignee-picker">Assign to teammate</label><div class="assign-controls"><select id="assignee-picker" name="assignee_id"><option value="">Unassigned</option>${state.members.map((member) => `<option value="${safe(member.id)}" ${member.id === item.assignee_id ? "selected" : ""}>${safe(member.display_name)} · ${safe(humanize(member.role))}</option>`).join("")}</select><button class="button button-secondary" type="submit">Save assignment</button></div><p class="form-error" id="assign-error" role="alert"></p></form>` : ""}
       ${isEditor ? `<form id="edit-item-form"><strong class="activity-heading">Edit work item</strong><div class="edit-grid"><label>Title<input name="title" maxlength="200" required value="${safe(item.title)}" /></label><label>Priority<select name="priority">${["low", "normal", "high", "urgent"].map((p) => `<option value="${p}" ${p === item.priority ? "selected" : ""}>${humanize(p)}</option>`).join("")}</select></label><label>Description<input name="description" maxlength="10000" value="${safe(item.description || "")}" /></label><label>Due date<input name="due_at" type="date" value="${safe(dueValue)}" /></label></div><div class="edit-actions"><button class="button button-secondary" type="submit">Save changes</button></div><p class="form-error" id="edit-error" role="alert"></p></form>` : ""}
       <h3 class="activity-heading">Activity history <span class="result-badge">${activity.length}</span></h3>
       ${activity.length ? `<div class="timeline">${activity.map((event) => `<div class="timeline-row"><span class="timeline-mark">·</span><div class="timeline-copy">${safe(eventDescription(event))}<div class="timeline-time">${safe(formatDate(event.created_at))}</div></div></div>`).join("")}</div>` : '<p class="muted small-copy">No activity recorded yet.</p>'}
@@ -229,10 +242,29 @@ async function openDetail(itemId) {
     `;
     $("#claim-item")?.addEventListener("click", () => performItemAction(item, "claim"));
     $("#transition-item")?.addEventListener("click", () => performItemAction(item, "transition", next));
+    $("#assign-item-form")?.addEventListener("submit", (event) => assignItem(event, item));
     $("#edit-item-form")?.addEventListener("submit", (event) => saveItem(event, item));
     $("#comment-form")?.addEventListener("submit", (event) => addComment(event, item));
   } catch (error) {
     content.innerHTML = `<p class="form-error">${safe(error.message)}</p>`;
+  }
+}
+
+async function assignItem(event, item) {
+  event.preventDefault();
+  const assigneeId = new FormData(event.currentTarget).get("assignee_id") || null;
+  try {
+    await api(`/items/${item.id}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ expected_version: item.version, assignee_id: assigneeId }),
+    });
+    notify(assigneeId ? "Work item assigned." : "Work item unassigned.");
+    await openDetail(item.id);
+    await loadItems();
+  } catch (error) {
+    $("#assign-error").textContent = error.status === 409
+      ? "This item changed. Close and reopen it before assigning."
+      : error.message;
   }
 }
 
@@ -315,6 +347,7 @@ $("#login-form").addEventListener("submit", async (event) => {
 $("#team-picker").addEventListener("change", async (event) => {
   state.teamId = event.target.value;
   state.role = state.teams.find((team) => team.team_id === state.teamId)?.role || "viewer";
+  await loadTeamMembers();
   renderTeams();
   await loadItems();
 });
