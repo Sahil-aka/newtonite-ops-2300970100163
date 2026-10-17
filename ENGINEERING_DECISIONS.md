@@ -6,6 +6,8 @@ This document records the main implementation choices for the Newtonite Operatio
 
 **FastAPI** provides typed request validation, dependency injection, and generated OpenAPI documentation. The API is split into auth, team, and work item routers. Keeping the first version as one service is quick to develop and explain; the boundaries can later be split if scale or team ownership calls for it.
 
+The browser UI uses plain **HTML, CSS, and JavaScript**, served from the same FastAPI origin. This avoids a separate build tool and cross-origin setup for a short assessment while keeping the browser calls close to the API contract. The UI asks the server to filter and paginate rather than downloading all records. It displays version conflicts clearly and refreshes data after successful mutations.
+
 ## Data storage
 
 **PostgreSQL 16** is used in development and is intended for deployment. **SQLAlchemy 2** provides typed ORM models and explicit queries; **Alembic** tracks schema evolution. Docker Compose persists local data in a named volume, so stopping containers does not normally delete the database. Test setup uses a separately named `newtonite_test` database and validates that name before modifying its schema.
@@ -26,9 +28,9 @@ Claiming uses a conditional database update that succeeds only while `assignee_i
 
 Edits include an `expected_version`. Updates increment the version only when it matches the current row, rejecting stale edits with `409 Conflict`. Workflow changes check the allowed transition, expected version, and role. Each successful mutation records its activity event in the same transaction as the item change, so the event history cannot claim a change that failed to save.
 
-## Activity history
+## Activity history and comments
 
-The `activity_events` table stores the actor, event type, and old/new values for item creation, claims, edits, and transitions. Item detail returns the latest 50 events to keep responses bounded. A fuller audit policy could add retention rules, stronger immutability guarantees, and pagination for long histories.
+The `activity_events` table stores the actor, event type, and old/new values for item creation, claims, edits, transitions, and comments. Comments are append-only events in the same history, avoiding a separate comments table for this small application. Item detail returns the latest 50 events to keep responses bounded. A fuller audit policy could add retention rules, stronger immutability guarantees, and pagination for long histories.
 
 ## Seed data
 
@@ -40,8 +42,8 @@ The Dockerfile has a `development` target with reload and pytest support and a l
 
 ## Deliberate scope limits
 
-- The frontend is not implemented yet; Swagger UI is currently the interactive API surface.
+- The first frontend slice is implemented, but it has no automated browser tests and does not yet provide comment editing/deletion.
 - The demo has no registration, password reset, invitation, or team management endpoints.
 - There is no external monitoring, rate limiting, or background job system.
 - Render deployment wiring and public production configuration remain to be completed.
-- The critical workflow tests exercise router behavior against PostgreSQL; broader API integration and browser tests can be added with the frontend.
+- The critical workflow tests exercise router behavior against PostgreSQL; broader API integration and browser tests remain useful follow-up work.
