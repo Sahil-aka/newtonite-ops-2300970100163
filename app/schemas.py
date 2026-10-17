@@ -35,6 +35,12 @@ class TeamMembershipResponse(BaseModel):
     role: str
 
 
+class TeamMemberResponse(BaseModel):
+    id: UUID
+    display_name: str
+    role: str
+
+
 ItemType = Literal["incident", "customer_issue", "payment", "compliance", "task"]
 Priority = Literal["low", "normal", "high", "urgent"]
 Status = Literal["open", "in_progress", "awaiting_approval", "resolved", "closed"]
@@ -90,6 +96,11 @@ class WorkItemUpdate(BaseModel):
 class WorkItemTransition(BaseModel):
     expected_version: int = Field(gt=0)
     target_status: Status
+
+
+class WorkItemAssign(BaseModel):
+    expected_version: int = Field(gt=0)
+    assignee_id: UUID | None
 
 
 class WorkItemCommentCreate(BaseModel):

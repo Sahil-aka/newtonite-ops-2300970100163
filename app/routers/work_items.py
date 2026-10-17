@@ -15,6 +15,7 @@ from app.schemas import (
     Priority,
     Status,
     WorkItemCreate,
+    WorkItemAssign,
     WorkItemCommentCreate,
     WorkItemDetailResponse,
     WorkItemPage,
@@ -162,6 +163,58 @@ def require_item_role(db: Session, item: WorkItem, user: User, allowed_roles: tu
         raise HTTPException(status_code=404, detail="Work item not found")
     if membership.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Your team role cannot perform this action")
+
+
+@router.post("/items/{item_id}/assign", response_model=WorkItemResponse)
+def assign_work_item(
+    item_id: UUID,
+    payload: WorkItemAssign,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> WorkItemResponse:
+    item = get_accessible_item(db, item_id, user.id)
+    require_item_role(db, item, user, EDIT_ROLES)
+
+    if payload.expected_version != item.version:
+        raise HTTPException(status_code=409, detail="Work item changed; reload it before assigning")
+    if payload.assignee_id is not None:
+        target_membership = db.get(Membership, (payload.assignee_id, item.team_id))
+        target_user = db.get(User, payload.assignee_id)
+        if target_membership is None or target_user is None or not target_user.is_active:
+            raise HTTPException(status_code=422, detail="Assignee must be an active member of this team")
+    if item.assignee_id == payload.assignee_id:
+        return item
+
+    previous_assignee_id = item.assignee_id
+    result = db.execute(
+        update(WorkItem)
+        .where(
+            WorkItem.id == item.id,
+            WorkItem.team_id == item.team_id,
+            WorkItem.version == payload.expected_version,
+        )
+        .values(
+            assignee_id=payload.assignee_id,
+            version=WorkItem.version + 1,
+            updated_at=func.now(),
+        )
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Work item changed; reload it before assigning")
+
+    db.add(
+        ActivityEvent(
+            item_id=item.id,
+            actor_id=user.id,
+            event_type="assigned",
+            old_value={"assignee_id": str(previous_assignee_id) if previous_assignee_id else None},
+            new_value={"assignee_id": str(payload.assignee_id) if payload.assignee_id else None},
+        )
+    )
+    db.commit()
+    db.refresh(item)
+    return item
 
 
 @router.post("/items/{item_id}/claim", response_model=WorkItemResponse)

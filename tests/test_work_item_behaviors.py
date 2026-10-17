@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import ActivityEvent, User, WorkItem
-from app.routers.work_items import claim_work_item, get_accessible_item, transition_work_item, update_work_item
-from app.schemas import WorkItemTransition, WorkItemUpdate
+from app.routers.work_items import assign_work_item, claim_work_item, get_accessible_item, transition_work_item, update_work_item
+from app.schemas import WorkItemAssign, WorkItemTransition, WorkItemUpdate
 from tests.conftest import Scenario
 
 
@@ -123,5 +123,37 @@ def test_invalid_workflow_jump_is_rejected(scenario: Scenario) -> None:
                 WorkItemTransition(expected_version=1, target_status="closed"),
                 db,
                 member,
+            )
+    assert error.value.status_code == 422
+
+
+def test_team_lead_can_assign_item_to_teammate_and_record_history(scenario: Scenario) -> None:
+    with Session(scenario.engine) as db:
+        lead = db.get(User, scenario.lead_id)
+        result = assign_work_item(
+            scenario.item_id,
+            WorkItemAssign(expected_version=1, assignee_id=scenario.member_id),
+            db,
+            lead,
+        )
+        assert result.assignee_id == scenario.member_id
+        assert result.version == 2
+
+    with Session(scenario.engine) as db:
+        event = db.scalar(select(ActivityEvent).where(ActivityEvent.item_id == scenario.item_id))
+        assert event.event_type == "assigned"
+        assert event.old_value == {"assignee_id": None}
+        assert event.new_value == {"assignee_id": str(scenario.member_id)}
+
+
+def test_cannot_assign_item_to_user_outside_its_team(scenario: Scenario) -> None:
+    with Session(scenario.engine) as db:
+        lead = db.get(User, scenario.lead_id)
+        with pytest.raises(HTTPException) as error:
+            assign_work_item(
+                scenario.item_id,
+                WorkItemAssign(expected_version=1, assignee_id=scenario.outsider_id),
+                db,
+                lead,
             )
     assert error.value.status_code == 422
