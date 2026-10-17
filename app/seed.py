@@ -133,7 +133,7 @@ def seed(sample_item_count: int) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Seed repeatable Newtonite demo data.")
-    parser.add_argument("--items", type=int, default=1200, help="Number of deterministic sample items (default: 1200).")
+    parser.add_argument("--items", type=int, default=3000, help="Number of deterministic sample items (default: 3000).")
     arguments = parser.parse_args()
     if arguments.items < 0:
         parser.error("--items must be zero or greater")
