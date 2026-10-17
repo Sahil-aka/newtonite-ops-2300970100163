@@ -271,6 +271,21 @@ button {
   gap:8px;
   transition:.15s
 }
+.button:disabled {
+  cursor:wait;
+  opacity:.82
+}
+.button-spinner {
+  width:14px;
+  height:14px;
+  border:2px solid currentColor;
+  border-right-color:transparent;
+  border-radius:50%;
+  animation:button-spin .7s linear infinite
+}
+@keyframes button-spin {
+  to { transform:rotate(360deg) }
+}
 .button-primary {
   background:var(--blue);
   color:white;

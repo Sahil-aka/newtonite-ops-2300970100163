@@ -83,6 +83,20 @@ function notify(message) {
   notify.timer = setTimeout(() => toast.classList.remove("show"), 3200);
 }
 
+function setButtonLoading(button, label) {
+  button.dataset.defaultContent = button.innerHTML;
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  button.innerHTML = `<span class="button-spinner" aria-hidden="true"></span>${label}`;
+}
+
+function clearButtonLoading(button) {
+  button.disabled = false;
+  button.removeAttribute("aria-busy");
+  button.innerHTML = button.dataset.defaultContent;
+  delete button.dataset.defaultContent;
+}
+
 async function startApp() {
   if (!state.token) return showLogin();
   try {
@@ -347,7 +361,9 @@ async function saveItem(event, item) {
 $("#login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget);
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
   $("#login-error").textContent = "";
+  setButtonLoading(submitButton, "Signing in…");
   try {
     const result = await api("/auth/login", {
       method: "POST",
@@ -358,6 +374,8 @@ $("#login-form").addEventListener("submit", async (event) => {
     await startApp();
   } catch (error) {
     $("#login-error").textContent = error.message;
+  } finally {
+    clearButtonLoading(submitButton);
   }
 });
 
@@ -365,7 +383,9 @@ $("#signup-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   const errorElement = $("#signup-error");
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
   errorElement.textContent = "";
+  setButtonLoading(submitButton, "Creating account…");
   try {
     const result = await api("/auth/signup", {
       method: "POST",
@@ -380,6 +400,8 @@ $("#signup-form").addEventListener("submit", async (event) => {
     await startApp();
   } catch (error) {
     errorElement.textContent = error.message;
+  } finally {
+    clearButtonLoading(submitButton);
   }
 });
 
