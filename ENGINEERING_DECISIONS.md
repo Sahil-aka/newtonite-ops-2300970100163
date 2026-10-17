@@ -18,6 +18,16 @@ Passwords are verified with **Argon2** hashes via pwdlib. Login returns a signed
 
 This keeps authentication explainable and avoids server-side session storage. The current version has no refresh tokens, logout/revocation list, account registration, or login throttling. Use a high-entropy secret from the deployment environment and do not use seeded demo credentials publicly.
 
+| Action | Viewer | Member | Lead | Admin |
+| --- | --- | --- | --- | --- |
+| Read team items and activity | Yes | Yes | Yes | Yes |
+| Create, comment, edit, claim, assign | No | Yes | Yes | Yes |
+| Move through ordinary allowed states | No | Yes | Yes | Yes |
+| Approve `awaiting_approval` → `resolved` | No | No | Yes | No |
+| Manage teams or memberships | No | No | No | Not implemented |
+
+Admin currently has Member-level work-item permissions. The role exists in seeded data, but full team administration is deliberately outside this first version.
+
 ## Work item access and listing
 
 Work item reads are scoped through the user's team memberships. Unknown or inaccessible teams and items return `404` to avoid exposing whether another team's records exist. List filters run in PostgreSQL. Cursor pagination sorts by `updated_at` and `id`; the composite key gives stable ordering when timestamps match and avoids loading the entire result set.
@@ -38,6 +48,8 @@ The `activity_events` table stores the actor, event type, and old/new values for
 
 `python -m app.seed` creates deterministic team/user identities and sample items, and can be rerun without duplicating those rows. A shared password keeps local demonstrations easy; because it is intentionally shared, it is only suitable for local assessment use.
 
+The default seed contains 3,000 items so a reviewer can exercise several pages. Item numbers map deterministically to stable IDs; rerunning the seed adds any missing demo rows rather than replacing modified work.
+
 ## Container strategy
 
 The Dockerfile has a `development` target with reload and pytest support and a leaner final `production` target. Compose uses development; a hosted container build uses the final stage by default. This keeps the local feedback loop convenient while giving deployment a non-reloading server command.
@@ -49,3 +61,5 @@ The Dockerfile has a `development` target with reload and pytest support and a l
 - There is no external monitoring, rate limiting, or background job system.
 - Render deployment wiring and public production configuration remain to be completed.
 - The critical workflow tests exercise router behavior against PostgreSQL; broader API integration and browser tests remain useful follow-up work.
+- Idempotency keys and a transactional outbox were not added. The chosen critical behaviors are concurrent claim, stale-version rejection, workflow/Lead approval, team authorization, and team-scoped assignment; notifications/background processing are not part of the current product slice.
+- Text search uses `ILIKE` and has no full-text/trigram index; this is a measured-next-step optimization if realistic data shows it is needed.

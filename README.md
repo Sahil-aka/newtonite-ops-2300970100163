@@ -31,11 +31,18 @@ docker compose exec api python -m app.seed
 
 Open [http://localhost:8001](http://localhost:8001) for the website or [http://localhost:8001/docs](http://localhost:8001/docs) for API documentation. The API listens on port `8000` inside the container and is published at `8001` on the host. PostgreSQL is published at host port `5432` and stores data in the `postgres_data` Docker volume.
 
-The seed command creates three teams, demo users, and 1,200 sample work items by default. It can be rerun safely. For a different item count, use `docker compose exec api python -m app.seed --items 100`.
+The seed command creates three teams, ten demo users, and 3,000 sample work items by default to make filtering and pagination easy to demonstrate. It can be rerun safely. For a different item count, use `docker compose exec api python -m app.seed --items 100`.
 
 ### Demo login
 
-The seed script prints the demo password and account emails. It is currently `NewtoniteDemo2026!`; use an account from the Operations, Engineering, or Payments team, for example `member.ops@newtonite.local`. These shared credentials are for local demonstration only. Do not use them in a public deployment.
+The seeded accounts share the demo password `NewtoniteDemo2026!`. These shared credentials are for local demonstration only. Do not use them in a public deployment.
+
+| Role | Demo email | Team |
+| --- | --- | --- |
+| Admin | `admin.ops@newtonite.local` | Operations |
+| Lead | `lead.ops@newtonite.local` | Operations |
+| Member | `member.ops@newtonite.local` | Operations |
+| Viewer | `viewer.ops@newtonite.local` | Operations |
 
 Sign in on the website with a seeded email and password. The UI keeps the access token in browser session storage; the token lifetime is 60 minutes. You can also sign in through Swagger: run `POST /auth/login`, click **Authorize**, and enter the returned access token.
 
@@ -62,6 +69,15 @@ All work item routes require `Authorization: Bearer <access-token>`.
 
 Workflow: `open` → `in_progress` → `awaiting_approval` → `resolved` → `closed`. Only a team Lead can approve an item from `awaiting_approval` to `resolved`. Viewers can read team data; members, leads, and admins can create, assign, or change work items and add comments. A user without membership receives `404` for team-scoped resources. The interface provides team selection, queue shortcuts, server-side search and filters, cursor-based "Load more," create, self-claim, assign/unassign to a teammate, edit, transition, approval, and activity/comment views.
 
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser[HTML, CSS, JavaScript] -->|Same-origin HTTP and JWT| API[FastAPI]
+  API -->|SQLAlchemy 2 queries| DB[(PostgreSQL)]
+  Migrations[Alembic migrations] --> DB
+```
+
 ## Database migrations
 
 Apply schema changes with `docker compose exec api alembic upgrade head`. The initial migration is in `alembic/versions/`. Do not use `Base.metadata.create_all()` as a substitute for applying migrations to a deployment database.
@@ -76,6 +92,24 @@ docker compose exec api pytest -q
 ```
 
 The current suite covers simultaneous claims, stale version updates, Lead approval permissions, cross-team access, invalid workflow transitions, and team-scoped assignment with history.
+
+## Known limitations
+
+- The dashboard summary cards count the currently loaded page, not every matching row.
+- Search uses PostgreSQL `ILIKE`; no trigram/full-text index is configured yet.
+- The API does not implement idempotency keys for repeated create requests.
+- Notifications, a transactional outbox, and background workers are intentionally out of scope.
+- Browser behavior has not been covered by automated UI tests.
+- Access tokens have no refresh or revocation flow; demo accounts share one password.
+- Admin currently has the same work-item permissions as Member; there are no team/user administration endpoints.
+- Render deployment configuration and a public demo URL are still pending.
+
+## If I had another week
+
+- Add idempotency keys for item creation and test retries.
+- Add a transactional outbox only if notifications or other background work are introduced.
+- Add browser-level tests for login, team permissions, assignment, and stale-edit messages.
+- Add indexed text search and activity-history pagination after measuring query performance.
 
 ## Configuration and deployment notes
 
