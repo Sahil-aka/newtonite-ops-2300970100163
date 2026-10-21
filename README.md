@@ -70,8 +70,9 @@ The local seeded accounts use the same credentials shown above. To create a clea
 ### Prerequisites
 
 - Git
-- Docker Desktop with Docker Compose enabled
 - PowerShell (commands below are for Windows; adapt the copy command for another shell)
+- Docker Desktop with Docker Compose enabled for the recommended setup below
+- Python 3.12 and PostgreSQL 16 if you choose the no-Docker setup
 
 The easiest path is Docker Compose. It starts a local PostgreSQL container and the API, and keeps database files in the `postgres_data` named volume.
 
@@ -117,6 +118,42 @@ docker compose down
 
 If port `8001` is already in use, change the `api` port mapping in `compose.yaml` from `8001:8000` to `8002:8000`, then open `http://localhost:8002`.
 
+### Run without Docker
+
+Use this option if Python 3.12 and PostgreSQL 16 are installed on your computer. PostgreSQL must be running locally; the Python virtual environment does not include a database server.
+
+Create a dedicated local development role and database. In PowerShell, open the PostgreSQL command line as its administrator user:
+
+```powershell
+psql -U postgres -h localhost
+```
+
+At the `postgres=#` prompt, run:
+
+```sql
+CREATE ROLE newtonite WITH LOGIN CREATEDB PASSWORD 'newtonite_dev';
+CREATE DATABASE newtonite OWNER newtonite;
+\q
+```
+
+If the role already exists, update it with `ALTER ROLE newtonite WITH LOGIN CREATEDB PASSWORD 'newtonite_dev';` and create the database only if it does not already exist. These credentials are for local development only.
+
+Then, from the repository root in PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m alembic upgrade head
+python -m app.seed --items 100
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Open [http://localhost:8000](http://localhost:8000) or [http://localhost:8000/docs](http://localhost:8000/docs). If `.env` already exists, do not overwrite it; confirm its `DATABASE_URL` points to your local database. The local example URL is `postgresql+psycopg://newtonite:newtonite_dev@localhost:5432/newtonite`.
+
+You can point `DATABASE_URL` at Supabase instead, but then this local app and the hosted demo share the same data. Use a local PostgreSQL database for isolated practice and testing. Never commit real database credentials.
+
 ### Reset local demo data
 
 To delete the local PostgreSQL volume and all data in it, run:
@@ -139,6 +176,17 @@ docker compose exec api pytest -q
 ```
 
 The test fixture requires `TEST_DATABASE_URL` to point to a disposable PostgreSQL database named `newtonite_test`. Compose sets this variable to the local database container. The fixture verifies the database name before it creates and drops test tables, to protect the development database.
+
+To run tests without Docker, install the development requirements and set the disposable test database URL in PowerShell. The local `newtonite` role created above has `CREATEDB`, which lets the fixture create the test database if needed:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+$env:TEST_DATABASE_URL = "postgresql+psycopg://newtonite:newtonite_dev@localhost:5432/newtonite_test"
+python -m pytest -q
+Remove-Item Env:TEST_DATABASE_URL
+```
+
+The fixture drops and recreates tables only inside `newtonite_test`. Do not point `TEST_DATABASE_URL` at your development or Supabase database.
 
 The current tests cover:
 
